@@ -13,5 +13,6 @@ data class ProductEntity(
     val stockQuantity: Double,
     val minStock: Double,
     val unit: String = "un",
-    val warehouse: String = "Almacén Principal"
+    val warehouse: String = "Almacén Principal",
+    val supplierName: String = "Distribuidora Global S.A."
 )

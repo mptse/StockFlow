@@ -34,12 +34,14 @@ class MainActivity : ComponentActivity() {
             when (authState) {
                 AuthState.LOGIN -> {
                     LoginScreen(
+                        onLogin = { email, pass -> viewModel.loginUser(email, pass) },
                         onLoginSuccess = { authState = AuthState.DASHBOARD },
                         onNavigateToRegister = { authState = AuthState.REGISTER }
                     )
                 }
                 AuthState.REGISTER -> {
                     RegisterScreen(
+                        onRegister = { name, email, pass -> viewModel.registerUser(name, email, pass) },
                         onRegisterSuccess = { authState = AuthState.PLAN_SELECTION },
                         onBackToLogin = { authState = AuthState.LOGIN }
                     )
@@ -63,7 +65,7 @@ class MainActivity : ComponentActivity() {
             if (errorMessage != null) {
                 AlertDialog(
                     onDismissRequest = { viewModel.clearError() },
-                    title = { Text("Límite del Plan Gratuito") },
+                    title = { Text("Aviso de Sistema") },
                     text = { Text(errorMessage!!) },
                     confirmButton = {
                         Button(onClick = { viewModel.clearError() }) {

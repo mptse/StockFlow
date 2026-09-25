@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.mptse.stockflow.data.local.ProductEntity
 import com.mptse.stockflow.data.local.StockDatabase
 import com.mptse.stockflow.data.local.StockMovementEntity
+import com.mptse.stockflow.data.local.UserEntity
+import com.mptse.stockflow.data.local.UserDao
 import com.mptse.stockflow.data.repository.InventoryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,6 +18,7 @@ import kotlinx.coroutines.launch
 
 class InventoryViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: InventoryRepository
+    private val userDao: UserDao
 
     val products: StateFlow<List<ProductEntity>>
     val movements: StateFlow<List<StockMovementEntity>>
@@ -26,12 +29,17 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isDarkMode = MutableStateFlow(false)
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
+    private val _currentUserEmail = MutableStateFlow<String?>(null)
+    val currentUserEmail: StateFlow<String?> = _currentUserEmail.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     init {
         val database = StockDatabase.getDatabase(application)
         repository = InventoryRepository(database.productDao(), database.stockMovementDao())
+        userDao = database.userDao()
+
         products = repository.allProducts.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -44,12 +52,47 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
+    suspend fun registerUser(name: String, email: String, pass: String): Boolean {
+        val existing = userDao.getUserByEmail(email)
+        if (existing != null) {
+            _errorMessage.value = "Ya existe una cuenta registrada con este correo."
+            return false
+        }
+        userDao.insertUser(UserEntity(name = name, email = email, password = pass, isPro = false))
+        _currentUserEmail.value = email
+        _isProPlan.value = false
+        return true
+    }
+
+    suspend fun loginUser(email: String, pass: String): Boolean {
+        val user = userDao.getUserByEmail(email)
+        if (user == null || user.password != pass) {
+            _errorMessage.value = "Correo o contraseña incorrectos."
+            return false
+        }
+        _currentUserEmail.value = email
+        _isProPlan.value = user.isPro
+        return true
+    }
+
     fun setProPlan(isPro: Boolean) {
         _isProPlan.value = isPro
+        val email = _currentUserEmail.value
+        if (email != null) {
+            viewModelScope.launch {
+                userDao.updateUserPlan(email, isPro)
+            }
+        }
     }
 
     fun upgradeToPro() {
         _isProPlan.value = true
+        val email = _currentUserEmail.value
+        if (email != null) {
+            viewModelScope.launch {
+                userDao.updateUserPlan(email, true)
+            }
+        }
     }
 
     fun toggleDarkMode(enabled: Boolean) {

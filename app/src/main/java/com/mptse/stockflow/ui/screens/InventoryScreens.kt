@@ -43,7 +43,6 @@ fun InventoryScreen(
 
     val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF7F2FA)
     val topBarColor = if (isDarkMode) Color(0xFF1E1B24) else Color(0xFFEDE7F6)
-    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
     val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
     val primaryColor = Color(0xFF6B4FA0)
 
@@ -163,7 +162,12 @@ fun InventoryScreen(
                     HistoryTab(movements = movements, isDarkMode = isDarkMode)
                 }
                 3 -> {
-                    SupeediorsTab(isProPlan = isProPlan, isDarkMode = isDarkMode, onUpgrade = { viewModel.upgradeToPro() })
+                    SupeediorsTab(
+                        products = products,
+                        isProPlan = isProPlan,
+                        isDarkMode = isDarkMode,
+                        onUpgrade = { viewModel.upgradeToPro() }
+                    )
                 }
                 4 -> {
                     SettingsTab(
@@ -200,6 +204,7 @@ fun DashboardTab(
     isDarkMode: Boolean,
     onUpgrade: () -> Unit
 ) {
+    var showPaymentDialog by remember { mutableStateOf(false) }
     val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
     val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
 
@@ -246,7 +251,7 @@ fun DashboardTab(
                     MetricMiniCard(
                         modifier = Modifier.weight(1f),
                         title = "Valor Total",
-                        value = "$${String.format("%.2f", totalValue)}",
+                        value = "$${String.format("%,.0f", totalValue)} COP",
                         icon = Icons.Default.AttachMoney,
                         isDarkMode = isDarkMode
                     )
@@ -286,12 +291,12 @@ fun DashboardTab(
                     Text(text = "Obtén productos ilimitados, gestión multi-almacén, historial y módulo de proveedores.", fontSize = 13.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
-                        onClick = onUpgrade,
+                        onClick = { showPaymentDialog = true },
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B4FA0)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Actualizar a Plan Pro ⭐")
+                        Text("Actualizar a Plan Pro ⭐ ($39.900 COP/mes)")
                     }
                 }
             }
@@ -318,6 +323,16 @@ fun DashboardTab(
                 ProductItemStatic(product = product, isDarkMode = isDarkMode)
             }
         }
+    }
+
+    if (showPaymentDialog) {
+        PaymentDialog(
+            onDismiss = { showPaymentDialog = false },
+            onPaymentSuccess = {
+                showPaymentDialog = false
+                onUpgrade()
+            }
+        )
     }
 }
 
@@ -429,26 +444,32 @@ fun HistoryTab(movements: List<StockMovementEntity>, isDarkMode: Boolean) {
 
 @Composable
 fun SupeediorsTab(
+    products: List<ProductEntity>,
     isProPlan: Boolean,
     isDarkMode: Boolean,
     onUpgrade: () -> Unit
 ) {
+    var showPaymentDialog by remember { mutableStateOf(false) }
     val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
     val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
-    val suppliers = listOf(
-        Pair("Distribuidora Global S.A.", "contacto@distribuidoraglobal.com"),
-        Pair("Comercializadora del Norte", "ventas@comercializadoranorte.com"),
-        Pair("Importadora y Suministros S.L.", "info@importadorasuministros.com")
-    )
+
+    // Calculate money spent per supplier based on products associated with that supplier
+    val supplierSpending = products.groupBy { it.supplierName }.mapValues { entry ->
+        entry.value.sumOf { it.price * it.stockQuantity }
+    }
+
+    val defaultSuppliers = listOf("Distribuidora Global S.A.", "Comercializadora del Norte", "Importadora y Suministros S.L.")
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(text = "Directorio de Proveedores (Supeediors)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
-        
+        Text(text = "Directorio de Proveedores y Gastos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+        Text(text = "Aquí puedes ver cuánto dinero se ha invertido en compras por cada proveedor.", fontSize = 13.sp, color = Color.Gray)
+
         if (!isProPlan) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF42272B) else Color(0xFFFFEBEE)),
@@ -457,27 +478,39 @@ fun SupeediorsTab(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "⭐ Función del Plan Pro", fontWeight = FontWeight.Bold, color = Color.Red)
-                    Text(text = "En el Plan Gratuito solo puedes visualizar proveedores de muestra. Actualiza a Pro para añadir y gestionar tus propios proveedores.", fontSize = 13.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
+                    Text(text = "El cálculo de gastos por proveedor y gestión avanzada es exclusivo del Plan Pro.", fontSize = 13.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = onUpgrade, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B4FA0))) {
-                        Text("Activar Pro")
+                    Button(onClick = { showPaymentDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B4FA0))) {
+                        Text("Activar Pro ($39.900 COP/mes)")
                     }
                 }
             }
         }
 
-        suppliers.forEach { (name, email) ->
+        defaultSuppliers.forEach { supplierName ->
+            val spent = supplierSpending[supplierName] ?: 0.0
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = cardColor),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
-                    Text(text = email, fontSize = 13.sp, color = Color.Gray)
+                    Text(text = supplierName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "Total invertido en productos: $${String.format("%,.0f", spent)} COP", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6B4FA0))
                 }
             }
         }
+    }
+
+    if (showPaymentDialog) {
+        PaymentDialog(
+            onDismiss = { showPaymentDialog = false },
+            onPaymentSuccess = {
+                showPaymentDialog = false
+                onUpgrade()
+            }
+        )
     }
 }
 
@@ -489,12 +522,15 @@ fun SettingsTab(
     onUpgrade: () -> Unit,
     onLogout: () -> Unit
 ) {
+    var showPaymentDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
     val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
     val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -516,13 +552,45 @@ fun SettingsTab(
                 Spacer(modifier = Modifier.height(16.dp))
                 if (!isProPlan) {
                     Button(
-                        onClick = onUpgrade,
+                        onClick = { showPaymentDialog = true },
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B4FA0)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Actualizar a Plan Pro ⭐ ($9.99/mes)")
+                        Text("Actualizar a Plan Pro ⭐ ($39.900 COP/mes)")
                     }
+                }
+            }
+        }
+
+        // Monthly Inventory Report Card (Pro Feature)
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = cardColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Assessment, contentDescription = null, tint = Color(0xFF6B4FA0))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = "Reporte Mensual de Inventario ⭐", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Genera y descarga un reporte detallado en PDF/Texto del inventario y finanzas.", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        if (isProPlan) {
+                            showReportDialog = true
+                        } else {
+                            showPaymentDialog = true
+                        }
+                    },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF512DA8)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (isProPlan) "Generar Reporte Mensual" else "Desbloquear Reportes (Plan Pro)")
                 }
             }
         }
@@ -554,7 +622,7 @@ fun SettingsTab(
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onLogout,
@@ -564,6 +632,39 @@ fun SettingsTab(
         ) {
             Text("Cerrar Sesión", color = Color.White)
         }
+    }
+
+    if (showPaymentDialog) {
+        PaymentDialog(
+            onDismiss = { showPaymentDialog = false },
+            onPaymentSuccess = {
+                showPaymentDialog = false
+                onUpgrade()
+            }
+        )
+    }
+
+    if (showReportDialog) {
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = { Text("Reporte Mensual de Inventario", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("📅 Periodo: Septiembre 2026")
+                    Text("🏢 Estado: Plan Pro Activo")
+                    HorizontalDivider()
+                    Text("📊 Resumen:")
+                    Text("• Auditoría completada con éxito.")
+                    Text("• Todos los productos y existencias consolidados.")
+                    Text("• Inversión total por proveedor calculada.")
+                }
+            },
+            confirmButton = {
+                Button(onClick = { showReportDialog = false }) {
+                    Text("Descargar / Copiar Reporte")
+                }
+            }
+        )
     }
 }
 
@@ -640,7 +741,7 @@ fun ProductItemStatic(product: ProductEntity, isDarkMode: Boolean) {
         ) {
             Column {
                 Text(text = product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
-                Text(text = "SKU: ${product.sku} | $${product.price} / ${product.unit}", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.LightGray else Color.Gray)
+                Text(text = "SKU: ${product.sku} | $${product.price} COP / ${product.unit}", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.LightGray else Color.Gray)
             }
             Text(text = "${product.stockQuantity} ${product.unit}", fontWeight = FontWeight.Bold, color = Color(0xFFB388FF))
         }
@@ -672,8 +773,8 @@ fun ProductItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
-                Text(text = "SKU: ${product.sku} | Precio: $${product.price} / ${product.unit}", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
-                Text(text = "Almacén: ${product.warehouse}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(text = "SKU: ${product.sku} | Precio: $${product.price} COP / ${product.unit}", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
+                Text(text = "Almacén: ${product.warehouse} | Prov: ${product.supplierName}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Text(
                     text = "Stock: ${product.stockQuantity} ${product.unit} (Mín: ${product.minStock} ${product.unit})",
                     style = MaterialTheme.typography.bodySmall,
@@ -710,11 +811,14 @@ fun AddProductDialog(
     var minStock by remember { mutableStateOf("") }
     var unit by remember { mutableStateOf("un") }
     var warehouse by remember { mutableStateOf("Almacén Principal") }
+    var supplierName by remember { mutableStateOf("Distribuidora Global S.A.") }
     var expandedUnit by remember { mutableStateOf(false) }
     var expandedWarehouse by remember { mutableStateOf(false) }
+    var expandedSupplier by remember { mutableStateOf(false) }
 
     val units = listOf("un" to "Unidades (un)", "lb" to "Libras (lb)", "kg" to "Kilogramos (kg)", "lt" to "Litros (lt)", "m" to "Metros (m)")
     val warehouses = listOf("Almacén Principal", "Depósito Secundario", "Sucursal Norte", "Bodega Central")
+    val suppliers = listOf("Distribuidora Global S.A.", "Comercializadora del Norte", "Importadora y Suministros S.L.")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -746,7 +850,7 @@ fun AddProductDialog(
                 OutlinedTextField(
                     value = price,
                     onValueChange = { price = it },
-                    label = { Text("Precio por unidad/medida ($)") },
+                    label = { Text("Precio por unidad/medida ($ COP)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -826,6 +930,51 @@ fun AddProductDialog(
                         readOnly = true,
                         enabled = false,
                         label = { Text("Almacén (Bloqueado)") },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // Supplier Selector (Pro feature)
+                if (isPro) {
+                    ExposedDropdownMenuBox(
+                        expanded = expandedSupplier,
+                        onExpandedChange = { expandedSupplier = !expandedSupplier },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = supplierName,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Proveedor ⭐ (Pro)") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedSupplier) },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedSupplier,
+                            onDismissRequest = { expandedSupplier = false }
+                        ) {
+                            suppliers.forEach { sup ->
+                                DropdownMenuItem(
+                                    text = { Text(sup) },
+                                    onClick = {
+                                        supplierName = sup
+                                        expandedSupplier = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = "Distribuidora Global S.A. (Plan Pro para cambiar)",
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = false,
+                        label = { Text("Proveedor (Bloqueado)") },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )

@@ -21,15 +21,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mptse.stockflow.ui.components.SFLogo
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
+    onLogin: suspend (String, String) -> Boolean,
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     val deepPurple = Color(0xFF36204B)
     val cardBackground = Color(0xFFFFFFFF)
@@ -89,7 +92,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Seguridad cifrada de extremo a extremo.",
+                        text = "Base de datos segura local (Room)",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
@@ -113,7 +116,7 @@ fun LoginScreen(
                         value = password,
                         onValueChange = { password = it },
                         placeholder = { Text("••••••••••") },
-                        label = { Text("Contraseña (Mín. 6 caracteres)") },
+                        label = { Text("Contraseña") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -136,8 +139,14 @@ fun LoginScreen(
                             } else if (password.length < 6) {
                                 errorMessage = "La contraseña debe tener al menos 6 caracteres."
                             } else {
-                                errorMessage = null
-                                onLoginSuccess()
+                                scope.launch {
+                                    val success = onLogin(email.trim(), password)
+                                    if (success) {
+                                        onLoginSuccess()
+                                    } else {
+                                        errorMessage = "Correo o contraseña incorrectos."
+                                    }
+                                }
                             }
                         },
                         shape = RoundedCornerShape(24.dp),
@@ -172,6 +181,7 @@ fun LoginScreen(
 
 @Composable
 fun RegisterScreen(
+    onRegister: suspend (String, String, String) -> Boolean,
     onRegisterSuccess: () -> Unit,
     onBackToLogin: () -> Unit
 ) {
@@ -179,6 +189,7 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     val deepPurple = Color(0xFF36204B)
     val cardBackground = Color(0xFFFFFFFF)
@@ -214,7 +225,7 @@ fun RegisterScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Crea tu cuenta cifrada en StockFlow.",
+                        text = "Tus datos se guardarán en la base de datos local.",
                         fontSize = 13.sp,
                         color = Color.Gray
                     )
@@ -272,8 +283,14 @@ fun RegisterScreen(
                             } else if (password.length < 6) {
                                 errorMessage = "La contraseña debe tener al menos 6 caracteres."
                             } else {
-                                errorMessage = null
-                                onRegisterSuccess()
+                                scope.launch {
+                                    val success = onRegister(name.trim(), email.trim(), password)
+                                    if (success) {
+                                        onRegisterSuccess()
+                                    } else {
+                                        errorMessage = "Ya existe una cuenta con este correo."
+                                    }
+                                }
                             }
                         },
                         shape = RoundedCornerShape(24.dp),
@@ -309,6 +326,7 @@ fun RegisterScreen(
 fun PlanSelectionScreen(
     onSelectPlan: (Boolean) -> Unit
 ) {
+    var showPaymentDialog by remember { mutableStateOf(false) }
     val deepPurple = Color(0xFF36204B)
     val primaryColor = Color(0xFF6B4FA0)
 
@@ -347,7 +365,7 @@ fun PlanSelectionScreen(
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(text = "Plan Gratuito", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = primaryColor)
-                    Text(text = "$0 / siempre", fontSize = 14.sp, color = Color.Gray)
+                    Text(text = "$0 COP / siempre", fontSize = 14.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(text = "• Hasta 50 productos\n• 1 almacén\n• Control básico de stock", fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(16.dp))
@@ -386,20 +404,30 @@ fun PlanSelectionScreen(
                             )
                         }
                     }
-                    Text(text = "$9.99 / mes", fontSize = 14.sp, color = Color.Gray)
+                    Text(text = "$39.900 COP / mes", fontSize = 14.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "• Productos ilimitados\n• -------------------\n• Múltiples almacenes y empleados\n• Reportes avanzados y soporte prioritario", fontSize = 14.sp)
+                    Text(text = "• Productos ilimitados\n• Múltiples almacenes y empleados\n• Reportes avanzados y soporte prioritario", fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
-                        onClick = { onSelectPlan(true) },
+                        onClick = { showPaymentDialog = true },
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Elegir Plan Pro")
+                        Text("Pagar $39.900 COP y Elegir Plan Pro")
                     }
                 }
             }
         }
+    }
+
+    if (showPaymentDialog) {
+        PaymentDialog(
+            onDismiss = { showPaymentDialog = false },
+            onPaymentSuccess = {
+                showPaymentDialog = false
+                onSelectPlan(true)
+            }
+        )
     }
 }
