@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mptse.stockflow.data.local.ProductEntity
+import com.mptse.stockflow.data.local.StockMovementEntity
 import com.mptse.stockflow.ui.InventoryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +31,9 @@ fun InventoryScreen(
     onLogout: () -> Unit = {}
 ) {
     val products by viewModel.products.collectAsState()
+    val movements by viewModel.movements.collectAsState()
     val isProPlan by viewModel.isProPlan.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -38,16 +41,19 @@ fun InventoryScreen(
     val totalItems = products.sumOf { it.stockQuantity }
     val lowStockCount = products.count { it.stockQuantity <= it.minStock }
 
-    val lavenderBg = Color(0xFFF7F2FA)
+    val bgColor = if (isDarkMode) Color(0xFF121212) else Color(0xFFF7F2FA)
+    val topBarColor = if (isDarkMode) Color(0xFF1E1B24) else Color(0xFFEDE7F6)
+    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
     val primaryColor = Color(0xFF6B4FA0)
 
     Scaffold(
-        containerColor = lavenderBg,
+        containerColor = bgColor,
         topBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFEDE7F6))
+                    .background(topBarColor)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(
@@ -71,12 +77,12 @@ fun InventoryScreen(
                                 text = "StockFlow",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF2C1B3D)
+                                color = textColor
                             )
                             Text(
                                 text = if (isProPlan) "⭐ Plan Pro Activo (Ilimitado)" else "Plan Gratuito (${products.size}/50)",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isProPlan) Color(0xFF512DA8) else Color.Gray,
+                                color = if (isProPlan) Color(0xFFB388FF) else Color.Gray,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -85,10 +91,10 @@ fun InventoryScreen(
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = Color.White) {
+            NavigationBar(containerColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White) {
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
-                    label = { Text("Dashboard") },
+                    label = { Text("Panel") },
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 }
                 )
@@ -99,16 +105,22 @@ fun InventoryScreen(
                     onClick = { selectedTab = 1 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Group, contentDescription = "Supeediors") },
-                    label = { Text("Supeediors") },
+                    icon = { Icon(Icons.Default.History, contentDescription = "Historial") },
+                    label = { Text("Historial") },
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings") },
+                    icon = { Icon(Icons.Default.Group, contentDescription = "Proveedores") },
+                    label = { Text("Proveedores") },
                     selected = selectedTab == 3,
                     onClick = { selectedTab = 3 }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Ajustes") },
+                    label = { Text("Ajustes") },
+                    selected = selectedTab == 4,
+                    onClick = { selectedTab = 4 }
                 )
             }
         },
@@ -130,31 +142,34 @@ fun InventoryScreen(
         ) {
             when (selectedTab) {
                 0 -> {
-                    // TAB 0: DASHBOARD
                     DashboardTab(
                         products = products,
                         totalValue = totalValue,
                         totalItems = totalItems,
                         lowStockCount = lowStockCount,
                         isProPlan = isProPlan,
+                        isDarkMode = isDarkMode,
                         onUpgrade = { viewModel.upgradeToPro() }
                     )
                 }
                 1 -> {
-                    // TAB 1: PRODUCTOS
                     ProductsTab(
                         products = products,
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        isDarkMode = isDarkMode
                     )
                 }
                 2 -> {
-                    // TAB 2: SUPEEDIORS (Proveedores)
-                    SupeediorsTab(isProPlan = isProPlan, onUpgrade = { viewModel.upgradeToPro() })
+                    HistoryTab(movements = movements, isDarkMode = isDarkMode)
                 }
                 3 -> {
-                    // TAB 3: SETTINGS
+                    SupeediorsTab(isProPlan = isProPlan, isDarkMode = isDarkMode, onUpgrade = { viewModel.upgradeToPro() })
+                }
+                4 -> {
                     SettingsTab(
                         isProPlan = isProPlan,
+                        isDarkMode = isDarkMode,
+                        onToggleDarkMode = { enabled -> viewModel.toggleDarkMode(enabled) },
                         onUpgrade = { viewModel.upgradeToPro() },
                         onLogout = onLogout
                     )
@@ -182,8 +197,12 @@ fun DashboardTab(
     totalItems: Double,
     lowStockCount: Int,
     isProPlan: Boolean,
+    isDarkMode: Boolean,
     onUpgrade: () -> Unit
 ) {
+    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -191,11 +210,10 @@ fun DashboardTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Summary Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = cardColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -203,7 +221,7 @@ fun DashboardTab(
                     text = "Resumen del Inventario",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2C1B3D)
+                    color = textColor
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -214,31 +232,33 @@ fun DashboardTab(
                         modifier = Modifier.weight(1f),
                         title = "Referencias",
                         value = "${products.size}",
-                        icon = Icons.Default.Description
+                        icon = Icons.Default.Description,
+                        isDarkMode = isDarkMode
                     )
                     MetricMiniCard(
                         modifier = Modifier.weight(1f),
                         title = "Existencias",
                         value = String.format("%.1f", totalItems),
                         subtitle = "total",
-                        icon = Icons.Default.Inventory
+                        icon = Icons.Default.Inventory,
+                        isDarkMode = isDarkMode
                     )
                     MetricMiniCard(
                         modifier = Modifier.weight(1f),
                         title = "Valor Total",
                         value = "$${String.format("%.2f", totalValue)}",
-                        icon = Icons.Default.AttachMoney
+                        icon = Icons.Default.AttachMoney,
+                        isDarkMode = isDarkMode
                     )
                 }
             }
         }
 
-        // Low stock warning banner
         if (lowStockCount > 0) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF42272B) else Color(0xFFFFEBEE))
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -248,23 +268,22 @@ fun DashboardTab(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(text = "Alerta de Stock Bajo", fontWeight = FontWeight.Bold, color = Color.Red)
-                        Text(text = "Tienes $lowStockCount producto(s) por debajo del mínimo.", fontSize = 12.sp, color = Color.DarkGray)
+                        Text(text = "Tienes $lowStockCount producto(s) por debajo del mínimo.", fontSize = 12.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
                     }
                 }
             }
         }
 
-        // Pro promotion banner if Free plan
         if (!isProPlan) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFEDE7F6))
+                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF2A2338) else Color(0xFFEDE7F6))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "🚀 Desbloquea StockFlow Pro", fontWeight = FontWeight.Bold, color = Color(0xFF512DA8), fontSize = 16.sp)
+                    Text(text = "🚀 Desbloquea StockFlow Pro", fontWeight = FontWeight.Bold, color = if (isDarkMode) Color(0xFFD1C4E9) else Color(0xFF512DA8), fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Obtén productos ilimitados, gestión multi-almacén y módulos de proveedores.", fontSize = 13.sp, color = Color.DarkGray)
+                    Text(text = "Obtén productos ilimitados, gestión multi-almacén, historial y módulo de proveedores.", fontSize = 13.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = onUpgrade,
@@ -282,7 +301,7 @@ fun DashboardTab(
             text = "Productos Recientes",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF2C1B3D)
+            color = textColor
         )
 
         if (products.isEmpty()) {
@@ -296,7 +315,7 @@ fun DashboardTab(
             }
         } else {
             products.take(5).forEach { product ->
-                ProductItemStatic(product = product)
+                ProductItemStatic(product = product, isDarkMode = isDarkMode)
             }
         }
     }
@@ -305,7 +324,8 @@ fun DashboardTab(
 @Composable
 fun ProductsTab(
     products: List<ProductEntity>,
-    viewModel: InventoryViewModel
+    viewModel: InventoryViewModel,
+    isDarkMode: Boolean
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val filteredProducts = products.filter {
@@ -345,8 +365,62 @@ fun ProductsTab(
                     ProductItem(
                         product = product,
                         onStockChange = { delta -> viewModel.updateStock(product.id, delta) },
-                        onDelete = { viewModel.deleteProduct(product) }
+                        onDelete = { viewModel.deleteProduct(product) },
+                        isDarkMode = isDarkMode
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HistoryTab(movements: List<StockMovementEntity>, isDarkMode: Boolean) {
+    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(text = "Historial de Movimientos de Stock", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+
+        if (movements.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = "No hay movimientos registrados", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(movements, key = { it.id }) { movement ->
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardColor),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = movement.productName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
+                                Text(text = "Tipo: ${movement.type}", fontSize = 13.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
+                            }
+                            Text(
+                                text = "${if (movement.delta > 0) "+" else ""}${movement.delta}",
+                                fontWeight = FontWeight.Bold,
+                                color = if (movement.delta > 0) Color(0xFF81C784) else Color(0xFFE57373),
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -356,8 +430,11 @@ fun ProductsTab(
 @Composable
 fun SupeediorsTab(
     isProPlan: Boolean,
+    isDarkMode: Boolean,
     onUpgrade: () -> Unit
 ) {
+    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
     val suppliers = listOf(
         Pair("Distribuidora Global S.A.", "contacto@distribuidoraglobal.com"),
         Pair("Comercializadora del Norte", "ventas@comercializadoranorte.com"),
@@ -370,17 +447,17 @@ fun SupeediorsTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(text = "Directorio de Proveedores (Supeediors)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(text = "Directorio de Proveedores (Supeediors)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
         
         if (!isProPlan) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+                colors = CardDefaults.cardColors(containerColor = if (isDarkMode) Color(0xFF42272B) else Color(0xFFFFEBEE)),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "⭐ Función del Plan Pro", fontWeight = FontWeight.Bold, color = Color.Red)
-                    Text(text = "En el Plan Gratuito solo puedes visualizar proveedores de muestra. Actualiza a Pro para añadir y gestionar tus propios proveedores.", fontSize = 13.sp)
+                    Text(text = "En el Plan Gratuito solo puedes visualizar proveedores de muestra. Actualiza a Pro para añadir y gestionar tus propios proveedores.", fontSize = 13.sp, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(onClick = onUpgrade, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6B4FA0))) {
                         Text("Activar Pro")
@@ -392,11 +469,11 @@ fun SupeediorsTab(
         suppliers.forEach { (name, email) ->
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = cardColor),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(text = name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = textColor)
                     Text(text = email, fontSize = 13.sp, color = Color.Gray)
                 }
             }
@@ -407,28 +484,33 @@ fun SupeediorsTab(
 @Composable
 fun SettingsTab(
     isProPlan: Boolean,
+    isDarkMode: Boolean,
+    onToggleDarkMode: (Boolean) -> Unit,
     onUpgrade: () -> Unit,
     onLogout: () -> Unit
 ) {
+    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(text = "Ajustes de la Cuenta", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(text = "Ajustes de la Cuenta", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = textColor)
 
         Card(
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
+            colors = CardDefaults.cardColors(containerColor = cardColor),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(text = "Estado del Plan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = "Estado del Plan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (isProPlan) "Plan Pro ⭐ (Activo e Ilimitado)" else "Plan Gratuito (Hasta 50 productos)",
-                    color = if (isProPlan) Color(0xFF512DA8) else Color.DarkGray,
+                    color = if (isProPlan) Color(0xFFB388FF) else Color.Gray,
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -442,6 +524,33 @@ fun SettingsTab(
                         Text("Actualizar a Plan Pro ⭐ ($9.99/mes)")
                     }
                 }
+            }
+        }
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = cardColor),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DarkMode, contentDescription = null, tint = Color(0xFF6B4FA0))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(text = "Modo Oscuro", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+                        Text(text = "Interfaz oscura para ahorro de batería", fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+                Switch(
+                    checked = isDarkMode,
+                    onCheckedChange = onToggleDarkMode
+                )
             }
         }
 
@@ -464,12 +573,16 @@ fun MetricMiniCard(
     title: String,
     value: String,
     subtitle: String? = null,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isDarkMode: Boolean
 ) {
+    val cardBg = if (isDarkMode) Color(0xFF2D2B36) else Color(0xFFF3EDF7)
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF3EDF7)),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -480,7 +593,7 @@ fun MetricMiniCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF6B4FA0),
+                tint = Color(0xFFB388FF),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -488,7 +601,7 @@ fun MetricMiniCard(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF2C1B3D)
+                color = textColor
             )
             if (subtitle != null) {
                 Text(
@@ -501,7 +614,7 @@ fun MetricMiniCard(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.DarkGray,
+                color = if (isDarkMode) Color.LightGray else Color.DarkGray,
                 maxLines = 1
             )
         }
@@ -509,11 +622,14 @@ fun MetricMiniCard(
 }
 
 @Composable
-fun ProductItemStatic(product: ProductEntity) {
+fun ProductItemStatic(product: ProductEntity, isDarkMode: Boolean) {
+    val cardColor = if (isDarkMode) Color(0xFF1E1B24) else Color.White
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
         Row(
             modifier = Modifier
@@ -523,10 +639,10 @@ fun ProductItemStatic(product: ProductEntity) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(text = product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = "SKU: ${product.sku} | $${product.price} / ${product.unit}", style = MaterialTheme.typography.bodyMedium)
+                Text(text = product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+                Text(text = "SKU: ${product.sku} | $${product.price} / ${product.unit}", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.LightGray else Color.Gray)
             }
-            Text(text = "${product.stockQuantity} ${product.unit}", fontWeight = FontWeight.Bold, color = Color(0xFF6B4FA0))
+            Text(text = "${product.stockQuantity} ${product.unit}", fontWeight = FontWeight.Bold, color = Color(0xFFB388FF))
         }
     }
 }
@@ -535,16 +651,17 @@ fun ProductItemStatic(product: ProductEntity) {
 fun ProductItem(
     product: ProductEntity,
     onStockChange: (Double) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isDarkMode: Boolean
 ) {
     val isLowStock = product.stockQuantity <= product.minStock
+    val cardColor = if (isLowStock) (if (isDarkMode) Color(0xFF42272B) else Color(0xFFFFEBEE)) else (if (isDarkMode) Color(0xFF1E1B24) else Color.White)
+    val textColor = if (isDarkMode) Color.White else Color(0xFF2C1B3D)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isLowStock) Color(0xFFFFEBEE) else Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
         Row(
             modifier = Modifier
@@ -554,9 +671,9 @@ fun ProductItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(text = "SKU: ${product.sku} | Precio: $${product.price} / ${product.unit}", style = MaterialTheme.typography.bodyMedium)
-                Text(text = "Almacén: ${product.warehouse}", style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
+                Text(text = product.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+                Text(text = "SKU: ${product.sku} | Precio: $${product.price} / ${product.unit}", style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color.LightGray else Color.DarkGray)
+                Text(text = "Almacén: ${product.warehouse}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 Text(
                     text = "Stock: ${product.stockQuantity} ${product.unit} (Mín: ${product.minStock} ${product.unit})",
                     style = MaterialTheme.typography.bodySmall,
@@ -566,10 +683,10 @@ fun ProductItem(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { onStockChange(-1.0) }) {
-                    Text(text = "-1", fontWeight = FontWeight.Bold, color = Color(0xFF6B4FA0))
+                    Text(text = "-1", fontWeight = FontWeight.Bold, color = Color(0xFFB388FF))
                 }
                 IconButton(onClick = { onStockChange(1.0) }) {
-                    Text(text = "+1", fontWeight = FontWeight.Bold, color = Color(0xFF6B4FA0))
+                    Text(text = "+1", fontWeight = FontWeight.Bold, color = Color(0xFFB388FF))
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mptse.stockflow.data.local.ProductEntity
 import com.mptse.stockflow.data.local.StockDatabase
+import com.mptse.stockflow.data.local.StockMovementEntity
 import com.mptse.stockflow.data.repository.InventoryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,17 +18,26 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository: InventoryRepository
 
     val products: StateFlow<List<ProductEntity>>
+    val movements: StateFlow<List<StockMovementEntity>>
 
     private val _isProPlan = MutableStateFlow(false)
     val isProPlan: StateFlow<Boolean> = _isProPlan.asStateFlow()
+
+    private val _isDarkMode = MutableStateFlow(false)
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     init {
-        val productDao = StockDatabase.getDatabase(application).productDao()
-        repository = InventoryRepository(productDao)
+        val database = StockDatabase.getDatabase(application)
+        repository = InventoryRepository(database.productDao(), database.stockMovementDao())
         products = repository.allProducts.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+        movements = repository.allMovements.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
@@ -40,6 +50,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun upgradeToPro() {
         _isProPlan.value = true
+    }
+
+    fun toggleDarkMode(enabled: Boolean) {
+        _isDarkMode.value = enabled
     }
 
     fun clearError() {

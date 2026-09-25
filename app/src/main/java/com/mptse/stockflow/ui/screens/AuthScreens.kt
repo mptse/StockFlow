@@ -3,7 +3,6 @@ package com.mptse.stockflow.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -16,10 +15,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mptse.stockflow.ui.components.SFLogo
 
 @Composable
 fun LoginScreen(
@@ -28,6 +29,7 @@ fun LoginScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val deepPurple = Color(0xFF36204B)
     val cardBackground = Color(0xFFFFFFFF)
@@ -48,16 +50,8 @@ fun LoginScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.2f),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("SF", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
+                SFLogo(size = 56)
+                Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
                         text = "StockFlow",
@@ -95,8 +89,8 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Bienvenido de nuevo a su panel de control.",
-                        fontSize = 14.sp,
+                        text = "Seguridad cifrada de extremo a extremo.",
+                        fontSize = 13.sp,
                         color = Color.Gray
                     )
 
@@ -119,19 +113,33 @@ fun LoginScreen(
                         value = password,
                         onValueChange = { password = it },
                         placeholder = { Text("••••••••••") },
-                        label = { Text("Contraseña") },
+                        label = { Text("Contraseña (Mín. 6 caracteres)") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Password),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         shape = RoundedCornerShape(16.dp),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = errorMessage!!, color = Color.Red, fontSize = 12.sp)
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        onClick = onLoginSuccess,
+                        onClick = {
+                            if (email.isBlank() || !email.contains("@")) {
+                                errorMessage = "Por favor, introduce un correo electrónico válido."
+                            } else if (password.length < 6) {
+                                errorMessage = "La contraseña debe tener al menos 6 caracteres."
+                            } else {
+                                errorMessage = null
+                                onLoginSuccess()
+                            }
+                        },
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = primaryButtonColor),
                         modifier = Modifier
@@ -170,6 +178,7 @@ fun RegisterScreen(
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val deepPurple = Color(0xFF36204B)
     val cardBackground = Color(0xFFFFFFFF)
@@ -198,15 +207,15 @@ fun RegisterScreen(
                         .padding(24.dp)
                 ) {
                     Text(
-                        text = "Registro",
+                        text = "Registro Seguro",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Empieza a controlar tu inventario hoy.",
-                        fontSize = 14.sp,
+                        text = "Crea tu cuenta cifrada en StockFlow.",
+                        fontSize = 13.sp,
                         color = Color.Gray
                     )
 
@@ -239,7 +248,7 @@ fun RegisterScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
-                        label = { Text("Contraseña") },
+                        label = { Text("Contraseña (Mín. 6 caracteres)") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         visualTransformation = PasswordVisualTransformation(),
                         shape = RoundedCornerShape(16.dp),
@@ -247,10 +256,26 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    if (errorMessage != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = errorMessage!!, color = Color.Red, fontSize = 12.sp)
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
-                        onClick = onRegisterSuccess,
+                        onClick = {
+                            if (name.isBlank()) {
+                                errorMessage = "Por favor, introduce el nombre del negocio."
+                            } else if (email.isBlank() || !email.contains("@")) {
+                                errorMessage = "Por favor, introduce un correo electrónico válido."
+                            } else if (password.length < 6) {
+                                errorMessage = "La contraseña debe tener al menos 6 caracteres."
+                            } else {
+                                errorMessage = null
+                                onRegisterSuccess()
+                            }
+                        },
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = primaryButtonColor),
                         modifier = Modifier
@@ -363,7 +388,7 @@ fun PlanSelectionScreen(
                     }
                     Text(text = "$9.99 / mes", fontSize = 14.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "• Productos ilimitados\n• Múltiples almacenes y empleados\n• Reportes avanzados y soporte prioritario", fontSize = 14.sp)
+                    Text(text = "• Productos ilimitados\n• -------------------\n• Múltiples almacenes y empleados\n• Reportes avanzados y soporte prioritario", fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = { onSelectPlan(true) },
